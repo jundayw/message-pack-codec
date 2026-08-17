@@ -51,7 +51,7 @@ class BitType extends AbstractType
         $value = parent::decode($buffer, $offset, $options);
 
         return array_map(
-            fn(array $field) => ($value >> $field[0]) & ((1 << $field[1]) - 1),
+            fn(array $field) => ($value >> $field[0]) & (1 << $field[1]) - 1,
             $options['fields'] ?? []
         );
     }
