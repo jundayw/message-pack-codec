@@ -44,6 +44,7 @@ abstract class AbstractType implements Type
         $format = $this->format($options['format'] ?? $this->format)->value;
         $count  = $this->count($options);
         $value  = $this->value($options) ?? $data[$options['name']] ?? null;
+        $value  = $this->encoding($value, $options);
 
         if (is_null($count)) {
             return pack($format, $value);
@@ -105,11 +106,77 @@ abstract class AbstractType implements Type
 
         $this->current = $offset + $length;
 
-        return match (true) {
+        $value = match (true) {
             is_int($count) => unpack("{$format}{$count}", substr($buffer, $offset, $length)),
             is_string($count) => unpack("{$format}*value", substr($buffer, $offset, $length))['value'],
             default => unpack("{$format}value", substr($buffer, $offset, $length))['value'],
         };
+
+        return $this->decoding($value, $options);
+    }
+
+    /**
+     * Converts string values to the target character encoding when the format
+     * represents a string type.
+     *
+     * Non-string formats are returned unchanged. Array values are processed
+     * recursively, allowing nested arrays to be encoded consistently.
+     *
+     * @param mixed $value   The value to be encoded.
+     * @param array $options Encoding and format options.
+     *
+     * @return mixed The encoded value.
+     */
+    protected function encoding(mixed $value, array $options = []): mixed
+    {
+        $format = $this->format($options['format'] ?? $this->format);
+
+        if (false === $format->isString()) {
+            return $value;
+        }
+
+        if (is_array($value)) {
+            $value = array_map(function ($v) use ($format, $options) {
+                if (is_array($v)) {
+                    return $this->encoding($v, $options);
+                }
+                return mb_convert_encoding($v, $options['encoding'] ?? 'UTF-8', 'UTF-8');
+            }, $value);
+        }
+
+        return $value;
+    }
+
+    /**
+     * Converts string values to the target character decoding when the format
+     * represents a string type.
+     *
+     * Non-string formats are returned unchanged. Array values are processed
+     * recursively, allowing nested arrays to be decoded consistently.
+     *
+     * @param mixed $value   The value to be encoded.
+     * @param array $options Decoding and format options.
+     *
+     * @return mixed The decoded value.
+     */
+    protected function decoding(mixed $value, array $options = []): mixed
+    {
+        $format = $this->format($options['format'] ?? $this->format);
+
+        if (false === $format->isString()) {
+            return $value;
+        }
+
+        if (is_array($value)) {
+            $value = array_map(function ($v) use ($format, $options) {
+                if (is_array($v)) {
+                    return $this->encoding($v, $options);
+                }
+                return mb_convert_encoding($v, 'UTF-8', $options['encoding'] ?? 'UTF-8');
+            }, $value);
+        }
+
+        return $value;
     }
 
     /**
