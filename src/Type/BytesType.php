@@ -50,7 +50,9 @@ class BytesType extends AbstractType
         };
 
         $this->current = $offset + $length;
-
+        var_dump([
+            strlen($buffer), $offset, $length,
+        ]);
         return substr($buffer, $offset, $length);
     }
 

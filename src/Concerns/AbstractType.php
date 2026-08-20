@@ -89,6 +89,8 @@ abstract class AbstractType implements Type
      */
     public function decode(string $buffer, int $offset, array $options = []): mixed
     {
+        $this->current = $offset;
+
         $format = $this->format($options['format'] ?? $this->format)->value;
         $count  = $this->count($options);
         $length = $this->length($options);
@@ -104,13 +106,14 @@ abstract class AbstractType implements Type
             },
         };
 
-        $this->current = $offset + $length;
-
         $value = match (true) {
             is_int($count) => unpack("{$format}{$count}", substr($buffer, $offset, $length)),
             is_string($count) => unpack("{$format}*value", substr($buffer, $offset, $length))['value'],
             default => unpack("{$format}value", substr($buffer, $offset, $length))['value'],
         };
+        var_dump($offset, $length, $this->current);
+        $this->current += $length;
+        var_dump($this->current, strlen($buffer));
 
         return $this->decoding($value, $options);
     }
@@ -260,6 +263,15 @@ abstract class AbstractType implements Type
     {
         if (array_key_exists('value', $options)) {
             return is_callable($value = $options['value']) ? call_user_func($value, $this->data) : $value;
+        }
+
+        return null;
+    }
+
+    public function offset(array $options = []): int|null
+    {
+        if (array_key_exists('offset', $options)) {
+            return is_callable($offset = $options['offset']) ? call_user_func($offset, $this->data) : $offset;
         }
 
         return null;

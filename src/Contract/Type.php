@@ -105,4 +105,6 @@ interface Type
      */
     public function value(array $options = []): mixed;
 
+    public function offset(array $options = []): int|null;
+
 }

@@ -225,7 +225,7 @@ enum Format: string
 
             self::STRING_NUL,
             self::STRING_SPACE,
-            self::STRING_NUL_TERMINATED,
+            self::STRING_NUL_TERMINATED => 1,
             self::HEX_LOW_FIRST,
             self::HEX_HIGH_FIRST,
             self::BACK,
