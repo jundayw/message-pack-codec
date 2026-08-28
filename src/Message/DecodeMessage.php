@@ -12,15 +12,9 @@ class DecodeMessage extends ArrayObject implements Message
         parent::__construct($array, 2);
     }
 
-    public function toArray(callable|null $callback = null): array
+    public function toArray(): array
     {
-        $callback = $callback ?? fn($msg) => $msg;
-
-        return array_map($callback, $this->getArrayCopy());
+        return array_map(fn($data) => $data instanceof DecodeMessage ? $data->toArray() : $data, $this->getArrayCopy());
     }
 
-    public function toString(callable|null $callback = null): string
-    {
-        return implode('', $this->toArray($callback));
-    }
 }

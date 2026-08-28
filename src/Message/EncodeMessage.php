@@ -12,15 +12,30 @@ class EncodeMessage extends ArrayObject implements Message
         parent::__construct($array, 2);
     }
 
-    public function toArray(callable|null $callback = null): array
+    public function toArray(): array
     {
-        $callback = $callback ?? fn($msg) => bin2hex($msg);
-
-        return array_map($callback, $this->getArrayCopy());
+        return array_map(function ($data) {
+            return $data instanceof EncodeMessage ? $data->toArray() : $data;
+        }, $this->getArrayCopy());
     }
 
-    public function toString(callable|null $callback = null): string
+    public function toString(): string
     {
-        return implode('', $this->toArray($callback));
+        return implode('', array_map(function ($value) {
+            return $value instanceof EncodeMessage ? $value->toString() : $value;
+        }, $this->getArrayCopy()));
     }
+
+    public function toHex(): string
+    {
+        return implode('', array_map(function ($value) {
+            return $value instanceof EncodeMessage ? $value->toString() : bin2hex($value);
+        }, $this->getArrayCopy()));
+    }
+
+    public function __toString(): string
+    {
+        return $this->toString();
+    }
+
 }
