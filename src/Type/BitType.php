@@ -2,58 +2,53 @@
 
 namespace Jundayw\MessagePackCodec\Type;
 
-use Jundayw\MessagePackCodec\Concerns\AbstractType;
+use Jundayw\MessagePackCodec\Concerns\Type;
 use Jundayw\MessagePackCodec\Support\Format;
 
-class BitType extends AbstractType
+class BitType extends Type
 {
     /**
-     * @param array  $data   Context data
-     * @param Format $format The format character used by PHP's pack/unpack functions.
+     * @inheritdoc
+     *
+     * @return Format
      */
-    public function __construct(
-        array $data = [],
-        Format $format = Format::UINT16_BIG,
-    ) {
-        parent::__construct($data, $format);
+    protected function default(Format|null $format = null): Format
+    {
+        if (is_null($format)) {
+            return Format::UINT16_BIG;
+        }
+
+        return $format;
     }
 
     /**
      * @inheritdoc
      *
-     * @return string The encoded binary data.
+     * @return string
      */
-    public function encode(array $data, array $options = []): string
+    public function encode(mixed $value, array $options = []): string
     {
-        $format = $this->format($options['format'] ?? $this->format)->value;
-        $count  = $this->count($options);
-        $value  = $this->value($options) ?? $data[$options['name']] ?? [];
-
         $values = 0;
+
         foreach ($options['fields'] ?? [] as $key => [$offset, $bits]) {
             $values |= ($value[$key] & (1 << $bits) - 1) << $offset;
         }
 
-        if (is_null($count)) {
-            return pack($format, $values);
-        }
-
-        return is_array($values) ? pack("{$format}{$count}", ...$values) : pack("{$format}{$count}", $values);
+        return parent::encode($values, $options);
     }
 
     /**
      * @inheritdoc
      *
-     * @return array The decoded value, or null if decoding fails.
+     * @return array
      */
-    public function decode(string $buffer, int $offset, array $options = []): array
+    public function decode(string $binary, int $offset, array $options = []): array
     {
-        $value = parent::decode($buffer, $offset, $options);
+        $value = parent::decode($binary, $offset, $options);
 
         return array_map(
             fn(array $field) => ($value >> $field[0]) & (1 << $field[1]) - 1,
             $options['fields'] ?? []
         );
     }
-
 }

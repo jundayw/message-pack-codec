@@ -2,20 +2,24 @@
 
 namespace Jundayw\MessagePackCodec\Type;
 
-use Jundayw\MessagePackCodec\Concerns\IntegerType;
+use Jundayw\MessagePackCodec\Concerns\Type;
 use Jundayw\MessagePackCodec\Support\Format;
 
-class UInt32Type extends IntegerType
+class UInt32Type extends Type
 {
     /**
-     * @param array  $data   Context data
-     * @param Format $format The format character used by PHP's pack/unpack functions.
+     * @inheritdoc
+     *
+     * @return Format
      */
-    public function __construct(
-        array $data = [],
-        Format $format = Format::UINT32_BIG,
-    ) {
-        parent::__construct($data, $format);
-    }
+    protected function default(Format|null $format = null): Format
+    {
+        if (is_null($format)) {
+            return Format::UINT32_BIG;
+        }
 
+        $host   = $format->isBigHost() ? Format::UINT32_BIG : Format::UINT32_LITTLE;
+
+        return $format->isHostEndian() ? $host : $format;
+    }
 }

@@ -7,104 +7,103 @@ use Jundayw\MessagePackCodec\Support\Format;
 interface Type
 {
     /**
-     * Encode a value into its binary representation.
+     * Resolve option values.
      *
-     * @param array $data
-     * @param array{
-     *      name?:string,
-     *      type?:string,
-     *      format?:Format,
-     *      length?:int|callable,
-     *      count?:int|string|callable
-     *  }           $options Encoding or decoding options.
+     * Callable options are evaluated with the given arguments, while
+     * scalar or object options are returned as-is.
+     *
+     * This is useful when an option depends on runtime encoding or
+     * decoding arguments.
+     *
+     * @param array $arguments Arguments passed to callable options.
+     * @param array $option    Options to resolve.
+     *
+     * @return array The resolved option values.
+     */
+    public function options(array $arguments = [], array $option = []): array;
+
+    /**
+     * Encode a value into binary data.
+     *
+     * The concrete type determines the PHP pack() format through
+     * {@see character()}, while {@see encodeValues()} normalizes the
+     * input value into arguments accepted by pack().
+     *
+     * @param mixed $value   The value to encode.
+     * @param array $options Encoding options.
      *
      * @return string The encoded binary data.
      */
-    public function encode(array $data, array $options = []): string;
+    public function encode(mixed $value, array $options = []): string;
 
     /**
-     * Decode a value from the binary buffer.
+     * Decode binary data.
      *
-     * The current offset is used as the starting position.
-     * The internal cursor is updated to the offset immediately
-     * after the decoded value.
+     * The specified offset is used as the starting position. The generated
+     * format character determines how much data is decoded. After decoding,
+     * the internal cursor is updated to the position immediately following
+     * the decoded data.
      *
-     * @param string $buffer  The binary buffer.
-     * @param int    $offset  The current read offset, passed by reference.
-     * @param array{
-     *     name?:string,
-     *     type?:string,
-     *     format?:Format,
-     *     length?:int|callable,
-     *     count?:int|string|callable
-     * }             $options Encoding or decoding options.
+     * @param string $binary  Binary data to decode.
+     * @param int    $offset  Default decoding offset.
+     * @param array  $options Decoding options.
      *
-     * @return mixed The decoded value, or null if decoding fails.
+     * @return mixed The decoded value or values.
      */
-    public function decode(string $buffer, int $offset, array $options = []): mixed;
+    public function decode(string $binary, int $offset, array $options = []): mixed;
 
     /**
-     * Get the offset immediately after the last decoded value.
+     * Get the current decoding cursor.
      *
-     * @return int The next read offset.
+     * The returned value is the offset immediately after the last
+     * decoded value and can be used as the starting offset for the
+     * next type.
+     *
+     * @return int The current cursor position.
      */
     public function next(): int;
 
     /**
-     * Resolves the number of bytes occupied by encoded value.
+     * Get an option value.
      *
-     * An explicitly supplied `length` option takes precedence over
-     * the format's default size. The length may be provided as a
-     * callable, in which case the current data context is passed
-     * to the callable.
+     * Returns the configured option when present; otherwise returns
+     * the specified default value.
      *
-     * @param array{
-     *     format?:Format,
-     *     length?:int|callable,
-     * } $options Encoding or decoding options.
+     * @param string $name    Option name.
+     * @param array  $options Options.
+     * @param mixed  $default Default value.
      *
-     * @return int|null Number of bytes occupied by the value, or null
-     *                 when no explicit length can be resolved.
+     * @return mixed The resolved option value.
      */
-    public function length(array $options = []): int|null;
+    public function option(string $name, array $options = [], mixed $default = null): mixed;
 
     /**
-     * Resolves the number of values represented by the current field.
+     * Get the current binary format.
      *
-     * The `count` option may be a fixed integer, a string expression,
-     * or a callable resolved against the codec's data context.
-     *
-     * If no count is configured, null is returned, indicating that
-     * the field represents a single value.
-     *
-     * @param array{
-     *     count?:int|string|callable
-     * } $options Encoding or decoding options.
-     *
-     * @return int|string|null Resolved value count, or null when the
-     *                         field represents a single value.
+     * @return Format The format used by this type.
      */
-    public function count(array $options = []): int|string|null;
+    public function format(): Format;
 
     /**
-     * Resolves the value that should be encoded.
+     * Build the PHP pack()/unpack() format character.
      *
-     * The `value` option takes precedence over the value stored in
-     * the input data. A callable value is evaluated using the codec's
-     * data context.
+     * The resulting format consists of the format character followed
+     * by the calculated element count.
      *
-     * Returning null indicates that no explicit value was provided,
-     * allowing the caller to fall back to the field value.
+     * For example:
      *
-     * @param array{
-     *     value?:mixed|callable
-     * } $options Encoding or decoding options.
+     * - `C1`
+     * - `n2`
+     * - `a6`
+     * - `H*`
      *
-     * @return mixed The resolved value, or null when no value option
-     *               is configured.
+     * When no explicit count is configured, the count is calculated
+     * from length and element size.
+     *
+     * @param array $options Encoding or decoding options.
+     *
+     * @return string The PHP pack()/unpack() format string.
      */
-    public function value(array $options = []): mixed;
-
-    public function offset(array $options = []): int|null;
+    public function character(array $options = []): string;
 
 }

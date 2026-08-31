@@ -29,7 +29,7 @@ class EncodeMessage extends ArrayObject implements Message
     public function toHex(): string
     {
         return implode('', array_map(function ($value) {
-            return $value instanceof EncodeMessage ? $value->toString() : bin2hex($value);
+            return $value instanceof EncodeMessage ? $value->toHex() : bin2hex($value);
         }, $this->getArrayCopy()));
     }
 
@@ -38,4 +38,13 @@ class EncodeMessage extends ArrayObject implements Message
         return $this->toString();
     }
 
+    public static function fromHex(string ...$string): static
+    {
+        return new self(array_map(fn($value) => hex2bin($value), func_get_args()));
+    }
+
+    public static function build(string ...$binary_string): static
+    {
+        return new self(array_map(fn($value) => $value instanceof EncodeMessage ? $value->toString() : $value, func_get_args()));
+    }
 }

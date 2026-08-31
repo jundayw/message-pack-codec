@@ -2,57 +2,56 @@
 
 namespace Jundayw\MessagePackCodec;
 
-use Jundayw\MessagePackCodec\Contract\Message;
 use Jundayw\MessagePackCodec\Contract\Type;
 use Jundayw\MessagePackCodec\Message\DecodeMessage;
 use Jundayw\MessagePackCodec\Message\EncodeMessage;
 
 class MessagePackCodec
 {
-    public function __construct(
-        protected array $data = [],
-        protected int $offset = 0,
-    ) {
-        //
-    }
-
-    public static function build(array $data = [], int $offset = 0): MessagePackCodec
+    public static function build(): MessagePackCodec
     {
-        return new self($data, $offset);
+        return new self;
     }
 
-    public function encode(array $data, array $options = []): Message
+    public function encode(array $data, array $options = []): EncodeMessage
     {
         $message = new EncodeMessage();
 
         foreach ($options as $key => $option) {
-            $name = $option['name'] ?? $key;
-            if (is_array($option['children'] ?? null)) {
-                $message[$name] = $this->encode($data['children'] ?? [], $option['children']);
+            if ($key === 'children' && array_key_exists('children', $data)) {
+                $message[$key] = $this->encode($data['children'], $option);
             }
-            if (false === is_null($instance = $this->newInstance($option))) {
-                $message[$name] = $instance->encode($data, $option);
+            if (is_null($instance = $this->newInstance($option))) {
+                continue;
             }
+            $option         = $instance->options([$data, $options, $message], $option);
+            $name           = $instance->option('name', $option, $key);
+            $value          = $instance->option('value', $option, $data[$name] ?? null);
+            $message[$name] = $instance->encode($value, $option);
         }
 
         return $message;
     }
 
-    public function decode(string $buffer, array $options = [], int $offset = 0): Message
+    protected int $cursor = 0;
+
+    public function decode(string $binary, array $options = [], int $offset = 0): DecodeMessage
     {
-        $this->offset = $offset ?: $this->offset;
-        $message      = new DecodeMessage();
+        $message = new DecodeMessage();
+
+        $this->cursor = $offset;
 
         foreach ($options as $key => $option) {
-            $name = $option['name'] ?? $key;
-            if (is_array($children = $option['children'] ?? null)) {
-                $message[$key] = $this->decode($buffer, $children, $this->offset);
+            if ($key === 'children') {
+                $message[$key] = $this->decode($binary, $option, $this->cursor);
             }
-            if (false === is_null($instance = $this->newInstance($option))) {
-                $offset         = $instance->offset($option) ?? $this->offset;
-                $message[$name] = $instance->decode($buffer, $offset, $option);
-                $this->offset   = $instance->next();
+            if (is_null($instance = $this->newInstance($option))) {
+                continue;
             }
+            $option = $instance->options([$message, $options], $option);
+            $name   = $instance->option('name', $option, $key);
+            $message[$name] = $instance->decode($binary, $this->cursor, $option);
+            $this->cursor   = $instance->next();
         }
 
         return $message;
@@ -60,8 +59,10 @@ class MessagePackCodec
 
     protected function newInstance(array $option = []): ?Type
     {
-        if (class_exists($class = $option['type'] ?? null)) {
-            return new $class($this->data);
+        if (array_key_exists('type', $option) &&
+            class_exists($class = $option['type']) &&
+            is_subclass_of($class, Type::class)) {
+            return new $class($option['format'] ?? null);
         }
 
         return null;

@@ -190,9 +190,9 @@ enum Format: string
      * For variable-length and control formats, the size depends on
      * the repeat count or the current packing context.
      *
-     * @return int|null
+     * @return float|null
      */
-    public function size(): ?int
+    public function size(): ?float
     {
         return match ($this) {
             self::INT8,
@@ -225,7 +225,7 @@ enum Format: string
 
             self::STRING_NUL,
             self::STRING_SPACE,
-            self::STRING_NUL_TERMINATED => 1,
+            self::STRING_NUL_TERMINATED,
             self::HEX_LOW_FIRST,
             self::HEX_HIGH_FIRST,
             self::BACK,
