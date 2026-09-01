@@ -23,6 +23,23 @@ interface Type
     public function options(array $arguments = [], array $option = []): array;
 
     /**
+     * Resolve and invoke a callable option.
+     *
+     * When the specified option is callable, it is invoked with the given
+     * value followed by any additional arguments. Otherwise, the original
+     * value is returned unchanged.
+     *
+     * @param string $name         The option name containing the callable.
+     * @param mixed  $value        The value passed to the callable.
+     * @param array  $option       Options containing the callable.
+     * @param mixed  ...$arguments Additional arguments passed to the callable.
+     *
+     * @return mixed The value returned by the callable, or the original value
+     *               when the option is not callable.
+     */
+    public function callable(string $name, mixed $value, array $option = [], mixed ...$arguments): mixed;
+
+    /**
      * Encode a value into binary data.
      *
      * The concrete type determines the PHP pack() format through

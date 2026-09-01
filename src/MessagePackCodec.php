@@ -26,8 +26,9 @@ class MessagePackCodec
             }
             $option         = $instance->options([$data, $options, $message], $option);
             $name           = $instance->option('name', $option, $key);
-            $value          = $instance->option('value', $option, $data[$name] ?? null);
-            $message[$name] = $instance->encode($value, $option);
+            $value          = $instance->option('value', $option, $data[$name] ?? '');
+            $value          = $instance->encode($value, $option);
+            $message[$name] = $instance->callable('encode', $value, $option, $data);
         }
 
         return $message;
@@ -48,9 +49,11 @@ class MessagePackCodec
             if (is_null($instance = $this->newInstance($option))) {
                 continue;
             }
-            $option = $instance->options([$message, $options], $option);
-            $name   = $instance->option('name', $option, $key);
-            $message[$name] = $instance->decode($binary, $this->cursor, $option);
+            $option         = ['cursor' => $this->cursor] + $option;
+            $option         = $instance->options([$message, $options], $option);
+            $name           = $instance->option('name', $option, $key);
+            $value          = $instance->decode($binary, $this->cursor, $option);
+            $message[$name] = $instance->callable('decode', $value, $option, $message);
             $this->cursor   = $instance->next();
         }
 

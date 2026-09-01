@@ -61,9 +61,36 @@ abstract class Type implements TypeContract
      */
     public function options(array $arguments = [], array $option = []): array
     {
-        return array_map(function ($option) use ($arguments) {
-            return is_callable($option) ? call_user_func_array($option, $arguments) : $option;
-        }, $option);
+        $preserved = array_flip([
+            'encode',
+            'decode',
+        ]);
+
+        return array_map(function ($value) use ($arguments) {
+                return is_callable($value) ? call_user_func_array($value, $arguments) : $value;
+            }, array_diff_key($option, $preserved)) + array_intersect_key($option, $preserved);
+    }
+
+    /**
+     * Resolve and invoke a callable option.
+     *
+     * When the specified option is callable, it is invoked with the given
+     * value followed by any additional arguments. Otherwise, the original
+     * value is returned unchanged.
+     *
+     * @param string $name         The option name containing the callable.
+     * @param mixed  $value        The value passed to the callable.
+     * @param array  $option       Options containing the callable.
+     * @param mixed  ...$arguments Additional arguments passed to the callable.
+     *
+     * @return mixed The value returned by the callable, or the original value
+     *               when the option is not callable.
+     */
+    public function callable(string $name, mixed $value, array $option = [], mixed ...$arguments): mixed
+    {
+        return is_callable($callable = $this->option($name, $option, $value))
+            ? call_user_func_array($callable, [$value, ...$arguments])
+            : $callable;
     }
 
     /**

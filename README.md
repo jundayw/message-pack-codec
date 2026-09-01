@@ -16,7 +16,6 @@ A simple, fast, and extensible MessagePack encoder and decoder for PHP.
 <details>
     <summary>Table of Contents</summary>
     <ol>
-        <li><a href="#roadmap">Roadmap</a></li>
         <li><a href="#installation">Installation</a></li>
         <li><a href="#usage">Usage</a></li>
         <li><a href="#contributing">Contributing</a></li>
@@ -24,21 +23,6 @@ A simple, fast, and extensible MessagePack encoder and decoder for PHP.
         <li><a href="#license">License</a></li>
     </ol>
 </details>
-
-<!-- ROADMAP -->
-
-## Roadmap
-
-- [ ] Feature 1
-- [x] Feature 2
-    - [x] Nested Feature
-- [ ] Feature 3
-    - [ ] Nested Feature
-    - [ ] Nested Feature
-
-See the [GitHub Open Issues] for a full list of proposed features (and known issues).
-
-<p align="right">[<a href="#readme-top">back to top</a>]</p>
 
 <!-- INSTALLATION -->
 
@@ -55,6 +39,633 @@ composer require jundayw/message-pack-codec
 <!-- USAGE EXAMPLES -->
 
 ## Usage
+
+`MessagePackCodec` uses a declarative field definition to describe how binary data should be encoded and decoded.
+
+Each field is defined by a set of options, such as `type`, `format`, `length`, `count`, `value`, and custom `encode` / `decode` callbacks.
+
+### Options
+
+```php
+[
+    'name'     => 'string',
+    'type'     => Type::class,          // Required
+    'format'   => Format::class,
+    'value'    => 'mixed|callable',
+    'count'    => 'int|callable',
+    'length'   => 'int|callable',
+    'offset'   => 'int|callable',
+    'size'     => 'int|callable',
+    'encoding' => 'string',             // StringType only
+    'fields'   => [                     // BitType only
+        'field' => ['offset', 'length'],
+    ],
+    'encode'   => 'callable',
+    'decode'   => 'callable',
+    'cursor'   => 'int',
+]
+```
+
+### Option Reference
+
+| Option     | Type              | Description                                           |
+|------------|-------------------|-------------------------------------------------------|
+| `name`     | `string`          | Field name                                            |
+| `type`     | `string`          | Type class used for encoding/decoding. Required       |
+| `format`   | `Format`          | Binary format used by the type                        |
+| `value`    | `mixed\|callable` | Value to encode. A callable receives the current data |
+| `count`    | `int\|callable`   | Number of values to encode/decode                     |
+| `length`   | `int\|callable`   | Length of the field in bytes                          |
+| `offset`   | `int\|callable`   | Offset used when reading the field                    |
+| `size`     | `int\|callable`   | Size of the field                                     |
+| `encoding` | `string`          | Character encoding for `StringType`                   |
+| `fields`   | `array`           | Bit-field definitions for `BitType`                   |
+| `encode`   | `callable`        | Custom value transformation before encoding           |
+| `decode`   | `callable`        | Custom value transformation after decoding            |
+| `cursor`   | `int`             | Initial/current binary cursor position                |
+
+> `callable` options are useful when a field depends on previously decoded or encoded values.
+
+---
+
+## Decode
+
+To decode binary data, define the structure of the binary packet using an associative array.
+
+For example, the following packet contains an IP address, TCP/UDP ports, channel information, playback information, and start/end times.
+
+```php
+use Jundayw\MessagePackCodec\Contract\Message;
+use Jundayw\MessagePackCodec\Message\EncodeMessage;
+use Jundayw\MessagePackCodec\MessagePackCodec;
+use Jundayw\MessagePackCodec\Type\BCDType;
+use Jundayw\MessagePackCodec\Type\StringType;
+use Jundayw\MessagePackCodec\Type\UInt8Type;
+use Jundayw\MessagePackCodec\Type\UInt16Type;
+
+$schema = [
+    'length' => [
+        'type' => UInt8Type::class,
+    ],
+
+    'ip' => [
+        'type'     => StringType::class,
+        'encoding' => 'GBK',
+        'length'   => fn(Message $message) => $message['length'],
+    ],
+
+    'tcp' => [
+        'type' => UInt16Type::class,
+    ],
+
+    'udp' => [
+        'type' => UInt16Type::class,
+    ],
+
+    'channel_id' => [
+        'type' => UInt8Type::class,
+    ],
+
+    'type' => [
+        'type' => UInt8Type::class,
+    ],
+
+    'stream' => [
+        'type' => UInt8Type::class,
+    ],
+
+    'storage' => [
+        'type' => UInt8Type::class,
+    ],
+
+    'play' => [
+        'type' => UInt8Type::class,
+    ],
+
+    'speed' => [
+        'type' => UInt8Type::class,
+    ],
+
+    's_time' => [
+        'type'   => BCDType::class,
+        'length' => 6,
+        'decode' => fn($value) => DateTime::createFromFormat('YmdHis', "20{$value}")->format('Y-m-d H:i:s'),
+    ],
+
+    'e_time' => [
+        'type'   => BCDType::class,
+        'length' => 6,
+        'decode' => 0,
+    ],
+];
+
+$binary = EncodeMessage::fromHex('093132372E302E302E31010301010000260901123059000000000000');
+
+$message = MessagePackCodec::build()->decode($binary, $schema);
+
+var_dump(
+    json_encode(
+        $message->toArray(),
+        JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
+    )
+);
+```
+
+Output:
+
+```json
+{
+    "length": 9,
+    "ip": "127.0.0.1",
+    "tcp": 259,
+    "udp": 769,
+    "channel_id": 1,
+    "type": 3,
+    "stream": 1,
+    "storage": 1,
+    "play": 0,
+    "speed": 0,
+    "s_time": "2026-09-01 12:30:59",
+    "e_time": "0000-00-00 00:00:00"
+}
+```
+
+> The actual numeric values depend on the configured byte order of `UInt16Type`. If the protocol specifies big-endian or little-endian explicitly, configure the corresponding `Format`.
+
+### Dynamic Length
+
+A field can reference a previously decoded field.
+
+For example, if the first byte specifies the length of the following IP address:
+
+```php
+$schema = [
+    'length' => [
+        'type' => UInt8Type::class,
+    ],
+
+    'ip' => [
+        'type'   => StringType::class,
+        'length' => fn (Message $message) => $message['length'],
+    ],
+];
+```
+
+For the binary data:
+
+```text
+09 31 32 37 2E 30 2E 30 2E 31
+```
+
+The decoder first reads:
+
+```text
+length = 9
+```
+
+and then uses that value to determine that the `ip` field occupies 9 bytes:
+
+```text
+ip = "127.0.0.1"
+```
+
+This allows packet definitions to describe variable-length protocols without manually managing the binary cursor.
+
+---
+
+## Encode
+
+Encoding uses the same field definition approach.
+
+The main difference is that `value` can be used to calculate a field dynamically from the input data.
+
+```php
+use Jundayw\MessagePackCodec\MessagePackCodec;
+use Jundayw\MessagePackCodec\Type\BCDType;
+use Jundayw\MessagePackCodec\Type\StringType;
+use Jundayw\MessagePackCodec\Type\UInt8Type;
+use Jundayw\MessagePackCodec\Type\UInt16Type;
+
+$schema = [
+    'length' => [
+        'type'  => UInt8Type::class,
+        'value' => fn(array $data) => strlen($data['ip']),
+    ],
+
+    'ip' => [
+        'type'     => StringType::class,
+        'encoding' => 'GBK',
+        'count'    => '*',
+    ],
+
+    'tcp' => [
+        'type' => UInt16Type::class,
+    ],
+
+    'udp' => [
+        'type' => UInt16Type::class,
+    ],
+
+    'channel_id' => [
+        'type' => UInt8Type::class,
+    ],
+
+    'type' => [
+        'type' => UInt8Type::class,
+    ],
+
+    'stream' => [
+        'type' => UInt8Type::class,
+    ],
+
+    'storage' => [
+        'type' => UInt8Type::class,
+    ],
+
+    'play' => [
+        'type' => UInt8Type::class,
+    ],
+
+    'speed' => [
+        'type' => UInt8Type::class,
+    ],
+
+    's_time' => [
+        'type'   => BCDType::class,
+        'length' => 6,
+        'value'  => fn(array $data) => DateTime::createFromFormat('Y-m-d H:i:s', $data['s_time'])->format('ymdHis'),
+    ],
+
+    'e_time' => [
+        'type'   => BCDType::class,
+        'length' => 6,
+    ],
+];
+
+$data = [
+    'ip'         => '127.0.0.1',
+    'tcp'        => 1078,
+    'udp'        => 1078,
+    'channel_id' => 1,
+    'type'       => 3,
+    'stream'     => 1,
+    'storage'    => 1,
+    'play'       => 0,
+    'speed'      => 0,
+    's_time'     => '2026-09-01 12:30:59',
+    'e_time'     => 0,
+];
+
+$message = MessagePackCodec::build()->encode($data, $schema);
+
+var_dump($message->toHex());
+```
+
+Output:
+
+```text
+093132372E302E302E31010301010000260901123059000000000000
+```
+
+### Dynamic Value
+
+`value` can be either a static value or a callable.
+
+Static value:
+
+```php
+'version' => [
+    'type'  => UInt8Type::class,
+    'value' => 1,
+],
+```
+
+Dynamic value:
+
+```php
+'length' => [
+    'type'  => UInt8Type::class,
+    'value' => fn (array $data) => strlen($data['content']),
+],
+```
+
+This is particularly useful for protocol fields such as:
+
+* body length
+* packet count
+* checksum
+* sequence number
+* timestamp
+* reserved fields
+* calculated flags
+
+---
+
+## Value Transformation
+
+The `encode` and `decode` options can be used to transform values without implementing a new `Type`.
+
+### Decode Transformation
+
+For example, convert a BCD timestamp into a PHP date-time string:
+
+```php
+'start_time' => [
+    'type'   => BCDType::class,
+    'length' => 6,
+    'decode' => fn($value) => DateTime::createFromFormat('ymdHis', $value)->format('Y-m-d H:i:s'),
+],
+```
+
+### Encode Transformation
+
+Convert a date-time string into BCD-compatible data:
+
+```php
+'start_time' => [
+    'type'   => BCDType::class,
+    'length' => 6,
+    'encode' => fn($value) => DateTime::createFromFormat('Y-m-d H:i:s', $value)->format('ymdHis'),
+],
+```
+
+This keeps binary representation logic inside the `Type`, while application-level value conversion remains in the schema.
+
+---
+
+## Count
+
+`count` controls the number of values handled by a field.
+
+It can be a fixed integer:
+
+```php
+'values' => [
+    'type'  => UInt8Type::class,
+    'count' => 4,
+],
+```
+
+or a dynamic callable:
+
+```php
+'values' => [
+    'type'  => UInt8Type::class,
+    'count' => fn (array $data) => $data['count'],
+],
+```
+
+For variable-length strings, `*` can be used when supported by the corresponding type:
+
+```php
+'content' => [
+    'type'  => StringType::class,
+    'count' => '*',
+],
+```
+
+---
+
+## Length
+
+`length` defines the number of bytes occupied by a field.
+
+A fixed length:
+
+```php
+'ip' => [
+    'type'   => StringType::class,
+    'length' => 15,
+],
+```
+
+A dynamic length:
+
+```php
+'ip' => [
+    'type'   => StringType::class,
+    'length' => fn (Message $message) => $message['length'],
+],
+```
+
+This is useful for binary protocols where a length field precedes a variable-length payload.
+
+---
+
+## String Encoding
+
+`StringType` supports character encoding conversion through the `encoding` option.
+
+```php
+'device_name' => [
+    'type'     => StringType::class,
+    'encoding' => 'GBK',
+    'length'   => 20,
+],
+```
+
+For UTF-8:
+
+```php
+'device_name' => [
+    'type'     => StringType::class,
+    'encoding' => 'UTF-8',
+    'length'   => 20,
+],
+```
+
+This is useful for protocols commonly using GBK, such as some Chinese IoT and vehicle telematics protocols.
+
+---
+
+## Bit Fields
+
+`BitType` can describe multiple logical fields stored inside a single integer.
+
+For example:
+
+```php
+'flags' => [
+    'type' => BitType::class,
+    'fields' => [
+        'reserved'   => [14, 2],
+        'version'    => [13, 1],
+        'subpackage' => [12, 1],
+        'encrypt'    => [10, 2],
+        'bodyLength' => [0, 10],
+    ],
+],
+```
+
+The definition above describes:
+
+```text
+┌──────────┬─────────┬─────────────┬─────────┬────────────────┐
+│ reserved │ version │ subpackage  │ encrypt │   bodyLength   │
+│  2 bits  │  1 bit  │    1 bit    │ 2 bits  │    10 bits     │
+└──────────┴─────────┴─────────────┴─────────┴────────────────┘
+```
+
+The fields can then be accessed by name rather than manually performing bitwise operations.
+
+This is especially useful for protocol headers containing:
+
+* version
+* encryption flags
+* subpackage flags
+* reserved bits
+* message length
+* status flags
+
+---
+
+## Cursor and Offset
+
+The codec maintains a binary cursor while decoding sequential fields.
+
+For example:
+
+```php
+$schema = [
+    'length' => [
+        'type' => UInt8Type::class,
+    ],
+
+    'body' => [
+        'type'   => StringType::class,
+        'length' => fn (Message $message) => $message['length'],
+    ],
+];
+```
+
+The cursor moves automatically:
+
+```text
+┌────────┬─────────────────────────┐
+│ length │          body           │
+│ 1 byte │       N bytes           │
+└────────┴─────────────────────────┘
+          ↑
+        cursor
+```
+
+When required, `cursor` or `offset` can be used to control the starting position or reading location.
+
+---
+
+## Reusing Schemas
+
+Because the packet structure is represented as an array, the same schema can be reused for multiple messages:
+
+```php
+$codec = MessagePackCodec::build();
+
+$message1 = $codec->decode($binary1, $schema);
+$message2 = $codec->decode($binary2, $schema);
+$message3 = $codec->decode($binary3, $schema);
+```
+
+Likewise, an encoding schema can be reused:
+
+```php
+$codec = MessagePackCodec::build();
+
+$message1 = $codec->encode($data1, $schema);
+$message2 = $codec->encode($data2, $schema);
+```
+
+This makes the schema itself a reusable description of the binary protocol.
+
+---
+
+## Encode and Decode in One Schema
+
+For simple protocols, a schema can be used for both encoding and decoding.
+
+```php
+$schema = [
+    'id' => [
+        'type' => UInt8Type::class,
+    ],
+
+    'name' => [
+        'type'   => StringType::class,
+        'length' => 16,
+    ],
+
+    'status' => [
+        'type' => UInt8Type::class,
+    ],
+];
+
+$codec = MessagePackCodec::build();
+
+$encoded = $codec->encode($data, $schema);
+
+$decoded = $codec->decode($encoded, $schema);
+```
+
+This allows a protocol structure to be defined once and used as both an encoder and decoder definition.
+
+---
+
+## Complete Example
+
+A typical binary protocol definition may look like:
+
+```php
+$schema = [
+    'length' => [
+        'type'  => UInt8Type::class,
+        'value' => fn (array $data) => strlen($data['content']),
+    ],
+
+    'content' => [
+        'type'     => StringType::class,
+        'encoding' => 'GBK',
+        'count'    => '*',
+    ],
+
+    'sequence' => [
+        'type' => UInt16Type::class,
+    ],
+
+    'timestamp' => [
+        'type'   => BCDType::class,
+        'length' => 6,
+        'encode' => fn ($value) =>
+            DateTime::createFromFormat(
+                'Y-m-d H:i:s',
+                $value
+            )->format('ymdHis'),
+        'decode' => fn ($value) =>
+            DateTime::createFromFormat(
+                'ymdHis',
+                $value
+            )->format('Y-m-d H:i:s'),
+    ],
+];
+
+$data = [
+    'content'   => 'Hello',
+    'sequence'  => 100,
+    'timestamp' => '2026-09-01 12:30:59',
+];
+
+$codec = MessagePackCodec::build();
+
+$encoded = $codec->encode($data, $schema);
+
+echo $encoded->toHex();
+
+$decoded = $codec->decode($encoded, $schema);
+
+print_r($decoded->toArray());
+```
+
+The key idea is that **the schema describes the binary layout, while `Type` describes how an individual value is encoded or decoded**.
+
+This separation allows the same codec to support different binary protocols without introducing protocol-specific logic into the codec itself.
 
 <!-- CONTRIBUTING -->
 

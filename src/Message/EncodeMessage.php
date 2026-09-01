@@ -29,7 +29,7 @@ class EncodeMessage extends ArrayObject implements Message
     public function toHex(): string
     {
         return implode('', array_map(function ($value) {
-            return $value instanceof EncodeMessage ? $value->toHex() : bin2hex($value);
+            return $value instanceof EncodeMessage ? $value->toHex() : strtoupper(bin2hex($value));
         }, $this->getArrayCopy()));
     }
 
