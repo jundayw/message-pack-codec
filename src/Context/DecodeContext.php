@@ -3,33 +3,86 @@
 namespace Jundayw\MessagePackCodec\Context;
 
 use Jundayw\MessagePackCodec\Contract\Context;
+use Jundayw\MessagePackCodec\Message\Bag;
 use Jundayw\MessagePackCodec\Message\DecodeMessage;
 
 class DecodeContext implements Context
 {
-    protected DecodeContext $parent;
-    public DecodeMessage    $message;
-    public array            $option = [];
+    protected DecodeContext|null $parent = null;
+
+    protected DecodeMessage $message;
+    protected Bag           $options;
+    protected Bag           $schema;
 
     public function __construct(
-        public readonly string $binary,
-        public readonly array $options = [],
+        protected readonly string $binary,
+        array $options = [],
         DecodeContext|null $parent = null,
     ) {
         $this->message = new DecodeMessage();
-        $this->parent  = $parent ?? $this;
+        $this->options = new Bag($options);
+        $this->schema  = new Bag();
+        $this->parent  = $parent;
     }
 
-    public function option(array $option): array
+    /**
+     * Get the context binary.
+     *
+     * @return string
+     */
+    public function binary(): string
     {
-        return $this->option = $option;
+        return $this->binary;
     }
 
-    public function parent(): DecodeContext
+    /**
+     * Get the context message.
+     *
+     * @return DecodeMessage
+     */
+    public function message(): DecodeMessage
+    {
+        return $this->message;
+    }
+
+    /**
+     * Get the context options.
+     *
+     * @return Bag
+     */
+    public function options(): Bag
+    {
+        return $this->options;
+    }
+
+    /**
+     * Get the context schema.
+     *
+     * @return Bag
+     */
+    public function schema(): Bag
+    {
+        return $this->schema;
+    }
+
+    /**
+     * Get the parent context.
+     *
+     * @return static|null
+     */
+    public function parent(): ?static
     {
         return $this->parent;
     }
 
+    /**
+     * Create a child context.
+     *
+     * @param string $binary
+     * @param array  $options
+     *
+     * @return static
+     */
     public function child(string $binary, array $options = []): static
     {
         return new static(

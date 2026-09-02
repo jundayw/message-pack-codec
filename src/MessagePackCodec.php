@@ -26,14 +26,14 @@ class MessagePackCodec
 
     protected function encodeContext(EncodeContext $context): EncodeMessage
     {
-        foreach ($context->options as $key => $option) {
+        foreach ($context->options()->all() as $key => $option) {
             if ($key === 'children') {
-                $context->message[$key] = $this->encodeContext(
+                $context->message()->set($key, $this->encodeContext(
                     $context->child(
-                        $context->data['children'] ?? [],
+                        $context->data()->get('children', []),
                         $option
                     )
-                );
+                ));
                 continue;
             }
 
@@ -41,17 +41,17 @@ class MessagePackCodec
                 continue;
             }
 
-            $option = $context->option($option);
+            $option = $context->schema()->make($option)->all();
             $option = $instance->options($context, $option);
             $name   = $instance->option('name', $option, $key);
-            $value  = $instance->option('value', $option, $context->data[$name] ?? '');
+            $value  = $instance->option('value', $option, $context->data()->get($name, ''));
             $value  = $instance->encode($value, $option);
             $encode = $instance->option('encode', $option);
 
-            $context->message[$name] = $instance->callable($encode, $value, $context);
+            $context->message()->set($name, $instance->callable($encode, $value, $context));
         }
 
-        return $context->message;
+        return $context->message();
     }
 
     public function decode(string $binary, array $options = [], int $offset = 0): DecodeMessage
@@ -65,12 +65,12 @@ class MessagePackCodec
     {
         $this->cursor = $offset;
 
-        foreach ($context->options as $key => $option) {
+        foreach ($context->options()->all() as $key => $option) {
             if ($key === 'children') {
-                $context->message[$key] = $this->decodeContext(
-                    $context->child($context->binary, $option),
+                $context->message()->set($key, $this->decodeContext(
+                    $context->child($context->binary(), $option),
                     $this->next()
-                );
+                ));
                 continue;
             }
 
@@ -78,17 +78,17 @@ class MessagePackCodec
                 continue;
             }
 
-            $option = $context->option(['cursor' => $this->next()] + $option);
+            $option = $context->schema()->make(['cursor' => $this->next()] + $option)->all();
             $option = $instance->options($context, $option);
             $name   = $instance->option('name', $option, $key);
-            $value  = $instance->decode($context->binary, $this->next(), $option);
+            $value  = $instance->decode($context->binary(), $this->next(), $option);
             $decode = $instance->option('decode', $option);
 
-            $context->message[$name] = $instance->callable($decode, $value, $context);
-            $this->cursor            = $instance->next();
+            $context->message()->set($name, $instance->callable($decode, $value, $context));
+            $this->cursor = $instance->next();
         }
 
-        return $context->message;
+        return $context->message();
     }
 
     public function next(): int

@@ -95,7 +95,7 @@ To decode binary data, define the structure of the binary packet using an associ
 For example, the following packet contains an IP address, TCP/UDP ports, channel information, playback information, and start/end times.
 
 ```php
-use Jundayw\MessagePackCodec\Contract\Context;
+use Jundayw\MessagePackCodec\Context\DecodeContext;
 use Jundayw\MessagePackCodec\Message\EncodeMessage;
 use Jundayw\MessagePackCodec\MessagePackCodec;
 use Jundayw\MessagePackCodec\Type\BCDType;
@@ -110,7 +110,7 @@ $schema = [
     'ip'         => [
         'type'     => StringType::class,
         'encoding' => 'GBK',
-        'length'   => fn(Context $context) => $context->message['length'],
+        'length'   => fn(DecodeContext $context) => $context->message()->get('length'),
     ],
     'tcp'        => [
         'type' => UInt16Type::class,
@@ -229,7 +229,7 @@ Encoding uses the same field definition approach.
 The main difference is that `value` can be used to calculate a field dynamically from the input data.
 
 ```php
-use Jundayw\MessagePackCodec\Contract\Context;
+use Jundayw\MessagePackCodec\Context\EncodeContext;
 use Jundayw\MessagePackCodec\MessagePackCodec;
 use Jundayw\MessagePackCodec\Type\BCDType;
 use Jundayw\MessagePackCodec\Type\StringType;
@@ -239,7 +239,7 @@ use Jundayw\MessagePackCodec\Type\UInt16Type;
 $schema = [
     'length'     => [
         'type'  => UInt8Type::class,
-        'value' => fn(Context $context) => strlen($context->data['ip']),
+        'value' => fn(EncodeContext $context) => strlen($context->data()->get('ip')),
     ],
     'ip'         => [
         'type'     => StringType::class,
