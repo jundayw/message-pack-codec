@@ -4,7 +4,9 @@
 
 MessagePack Codec, Built for PHP.
 
-A simple, fast, and extensible MessagePack encoder and decoder for PHP.
+A simple, fast, and extensible binary encoder and decoder for PHP.
+
+[中文](README_zh-CN.md) · English
 
 [![GitHub Tag][GitHub Tag]][GitHub Tag URL]
 [![Total Downloads][Total Downloads]][Packagist URL]

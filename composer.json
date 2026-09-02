@@ -3,8 +3,7 @@
     "description": "MessagePack Codec, Built for PHP.",
     "keywords": [
         "php",
-        "msgpack codec",
-        "messagepack codec",
+        "binary codec",
         "encoder",
         "decoder",
         "binary",
