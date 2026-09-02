@@ -195,7 +195,7 @@ $schema = [
 
     'ip' => [
         'type'   => StringType::class,
-        'length' => fn(Context $context) => $context->message['length'],
+        'length' => fn(Context $context) => $context->message()->get('length'),
     ],
 ];
 ```
@@ -273,7 +273,7 @@ $schema = [
     's_time'     => [
         'type'   => BCDType::class,
         'length' => 6,
-        'value'  => fn(Context $context) => DateTime::createFromFormat('Y-m-d H:i:s', $context->data['s_time'])->format('ymdHis'),
+        'value'  => fn(EncodeContext $context) => DateTime::createFromFormat('Y-m-d H:i:s', $context->data()->get('s_time'))->format('ymdHis'),
     ],
     'e_time'     => [
         'type'   => BCDType::class,
@@ -324,7 +324,7 @@ Dynamic value:
 ```php
 'length' => [
     'type'  => UInt8Type::class,
-    'value' => fn (Context $context) => strlen($context->data['content']),
+    'value' => fn (Context $context) => strlen($context->data()->get('content')),
 ],
 ```
 
@@ -390,7 +390,7 @@ or a dynamic callable:
 ```php
 'values' => [
     'type'  => UInt8Type::class,
-    'count' => fn (Context $context) => $context->data['count'],
+    'count' => fn (Context $context) => $context->data()->get('count'),
 ],
 ```
 
@@ -423,7 +423,7 @@ A dynamic length:
 ```php
 'ip' => [
     'type'   => StringType::class,
-    'length' => fn (Context $context) => $context->message['length'],
+    'length' => fn (Context $context) => $context->message()->get('length'),
 ],
 ```
 
@@ -512,7 +512,7 @@ $schema = [
 
     'body' => [
         'type'   => StringType::class,
-        'length' => fn (Context $context) => $context->message['length'],
+        'length' => fn (Context $context) => $context->message()->get('length'),
     ],
 ];
 ```
@@ -598,7 +598,7 @@ A typical binary protocol definition may look like:
 $schema = [
     'length' => [
         'type'  => UInt8Type::class,
-        'value' => fn(Context $context) => strlen($context->data['content']),
+        'value' => fn(Context $context) => strlen($context->data()->get('content')),
     ],
 
     'content' => [
