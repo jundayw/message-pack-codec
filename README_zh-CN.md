@@ -716,7 +716,7 @@ $schema = [
     'timestamp' => [
         'type'   => BCDType::class,
         'length' => 6,
-        'encode' => fn ($value) => DateTime::createFromFormat('Y-m-d H:i:s', $value)->format('ymdHis'),
+        'value' => fn ($value) => DateTime::createFromFormat('Y-m-d H:i:s', $value)->format('ymdHis'),
         'decode' => fn ($value) => DateTime::createFromFormat('ymdHis', $value)->format('20y-m-d H:i:s'),
     ],
 ];
