@@ -51,38 +51,38 @@ Each field is defined by a set of options, such as `type`, `format`, `length`, `
     'name'     => 'string',
     'type'     => Type::class,          // Required
     'format'   => Format::class,
-    'value'    => 'mixed|callable',
-    'count'    => 'int|callable',
-    'length'   => 'int|callable',
-    'offset'   => 'int|callable',
-    'size'     => 'int|callable',
+    'value'    => 'mixed|callable(Context)',
+    'count'    => 'int|callable(Context)',
+    'length'   => 'int|callable(Context)',
+    'offset'   => 'int|callable(Context)',
+    'size'     => 'int|callable(Context)',
     'encoding' => 'string',             // StringType only
     'fields'   => [                     // BitType only
         'field' => ['offset', 'length'],
     ],
-    'encode'   => 'callable',
-    'decode'   => 'callable',
+    'encode'   => 'callable(mixed, Context)',
+    'decode'   => 'callable(mixed, Context)',
     'cursor'   => 'int',
 ]
 ```
 
 ### Option Reference
 
-| Option     | Type              | Description                                           |
-|------------|-------------------|-------------------------------------------------------|
-| `name`     | `string`          | Field name                                            |
-| `type`     | `string`          | Type class used for encoding/decoding. Required       |
-| `format`   | `Format`          | Binary format used by the type                        |
-| `value`    | `mixed\|callable` | Value to encode. A callable receives the current data |
-| `count`    | `int\|callable`   | Number of values to encode/decode                     |
-| `length`   | `int\|callable`   | Length of the field in bytes                          |
-| `offset`   | `int\|callable`   | Offset used when reading the field                    |
-| `size`     | `int\|callable`   | Size of the field                                     |
-| `encoding` | `string`          | Character encoding for `StringType`                   |
-| `fields`   | `array`           | Bit-field definitions for `BitType`                   |
-| `encode`   | `callable`        | Custom value transformation before encoding           |
-| `decode`   | `callable`        | Custom value transformation after decoding            |
-| `cursor`   | `int`             | Initial/current binary cursor position                |
+| Option     | Type                       | Description                                           |
+|------------|----------------------------|-------------------------------------------------------|
+| `name`     | `string`                   | Field name                                            |
+| `type`     | `string`                   | Type class used for encoding/decoding. Required       |
+| `format`   | `Format`                   | Binary format used by the type                        |
+| `value`    | `mixed\|callable(Context)` | Value to encode. A callable receives the current data |
+| `count`    | `int\|callable(Context)`   | Number of values to encode/decode                     |
+| `length`   | `int\|callable(Context)`   | Length of the field in bytes                          |
+| `offset`   | `int\|callable(Context)`   | Offset used when reading the field                    |
+| `size`     | `int\|callable(Context)`   | Size of the field                                     |
+| `encoding` | `string`                   | Character encoding for `StringType`                   |
+| `fields`   | `array`                    | Bit-field definitions for `BitType`                   |
+| `encode`   | `callable(mixed, Context)` | Custom value transformation before encoding           |
+| `decode`   | `callable(mixed, Context)` | Custom value transformation after decoding            |
+| `cursor`   | `int`                      | Initial/current binary cursor position                |
 
 > `callable` options are useful when a field depends on previously decoded or encoded values.
 
@@ -95,7 +95,7 @@ To decode binary data, define the structure of the binary packet using an associ
 For example, the following packet contains an IP address, TCP/UDP ports, channel information, playback information, and start/end times.
 
 ```php
-use Jundayw\MessagePackCodec\Contract\Message;
+use Jundayw\MessagePackCodec\Contract\Context;
 use Jundayw\MessagePackCodec\Message\EncodeMessage;
 use Jundayw\MessagePackCodec\MessagePackCodec;
 use Jundayw\MessagePackCodec\Type\BCDType;
@@ -104,62 +104,51 @@ use Jundayw\MessagePackCodec\Type\UInt8Type;
 use Jundayw\MessagePackCodec\Type\UInt16Type;
 
 $schema = [
-    'length' => [
+    'length'     => [
         'type' => UInt8Type::class,
     ],
-
-    'ip' => [
+    'ip'         => [
         'type'     => StringType::class,
         'encoding' => 'GBK',
-        'length'   => fn(Message $message) => $message['length'],
+        'length'   => fn(Context $context) => $context->message['length'],
     ],
-
-    'tcp' => [
+    'tcp'        => [
         'type' => UInt16Type::class,
     ],
-
-    'udp' => [
+    'udp'        => [
         'type' => UInt16Type::class,
     ],
-
     'channel_id' => [
         'type' => UInt8Type::class,
     ],
-
-    'type' => [
+    'type'       => [
         'type' => UInt8Type::class,
     ],
-
-    'stream' => [
+    'stream'     => [
         'type' => UInt8Type::class,
     ],
-
-    'storage' => [
+    'storage'    => [
         'type' => UInt8Type::class,
     ],
-
-    'play' => [
+    'play'       => [
         'type' => UInt8Type::class,
     ],
-
-    'speed' => [
+    'speed'      => [
         'type' => UInt8Type::class,
     ],
-
-    's_time' => [
+    's_time'     => [
         'type'   => BCDType::class,
         'length' => 6,
-        'decode' => fn($value) => DateTime::createFromFormat('YmdHis', "20{$value}")->format('Y-m-d H:i:s'),
+        'decode' => fn($value) => DateTime::createFromFormat('ymdHis', $value)->format('20y-m-d H:i:s'),
     ],
-
-    'e_time' => [
+    'e_time'     => [
         'type'   => BCDType::class,
         'length' => 6,
         'decode' => 0,
     ],
 ];
 
-$binary = EncodeMessage::fromHex('093132372E302E302E31010301010000260901123059000000000000');
+$binary = EncodeMessage::fromHex('093132372E302E302E3104360436010301010000260901123059000000000000');
 
 $message = MessagePackCodec::build()->decode($binary, $schema);
 
@@ -206,7 +195,7 @@ $schema = [
 
     'ip' => [
         'type'   => StringType::class,
-        'length' => fn (Message $message) => $message['length'],
+        'length' => fn(Context $context) => $context->message['length'],
     ],
 ];
 ```
@@ -240,6 +229,7 @@ Encoding uses the same field definition approach.
 The main difference is that `value` can be used to calculate a field dynamically from the input data.
 
 ```php
+use Jundayw\MessagePackCodec\Contract\Context;
 use Jundayw\MessagePackCodec\MessagePackCodec;
 use Jundayw\MessagePackCodec\Type\BCDType;
 use Jundayw\MessagePackCodec\Type\StringType;
@@ -247,56 +237,45 @@ use Jundayw\MessagePackCodec\Type\UInt8Type;
 use Jundayw\MessagePackCodec\Type\UInt16Type;
 
 $schema = [
-    'length' => [
+    'length'     => [
         'type'  => UInt8Type::class,
-        'value' => fn(array $data) => strlen($data['ip']),
+        'value' => fn(Context $context) => strlen($context->data['ip']),
     ],
-
-    'ip' => [
+    'ip'         => [
         'type'     => StringType::class,
         'encoding' => 'GBK',
         'count'    => '*',
     ],
-
-    'tcp' => [
+    'tcp'        => [
         'type' => UInt16Type::class,
     ],
-
-    'udp' => [
+    'udp'        => [
         'type' => UInt16Type::class,
     ],
-
     'channel_id' => [
         'type' => UInt8Type::class,
     ],
-
-    'type' => [
+    'type'       => [
         'type' => UInt8Type::class,
     ],
-
-    'stream' => [
+    'stream'     => [
         'type' => UInt8Type::class,
     ],
-
-    'storage' => [
+    'storage'    => [
         'type' => UInt8Type::class,
     ],
-
-    'play' => [
+    'play'       => [
         'type' => UInt8Type::class,
     ],
-
-    'speed' => [
+    'speed'      => [
         'type' => UInt8Type::class,
     ],
-
-    's_time' => [
+    's_time'     => [
         'type'   => BCDType::class,
         'length' => 6,
-        'value'  => fn(array $data) => DateTime::createFromFormat('Y-m-d H:i:s', $data['s_time'])->format('ymdHis'),
+        'value'  => fn(Context $context) => DateTime::createFromFormat('Y-m-d H:i:s', $context->data['s_time'])->format('ymdHis'),
     ],
-
-    'e_time' => [
+    'e_time'     => [
         'type'   => BCDType::class,
         'length' => 6,
     ],
@@ -324,7 +303,7 @@ var_dump($message->toHex());
 Output:
 
 ```text
-093132372E302E302E31010301010000260901123059000000000000
+093132372E302E302E3104360436010301010000260901123059000000000000
 ```
 
 ### Dynamic Value
@@ -345,7 +324,7 @@ Dynamic value:
 ```php
 'length' => [
     'type'  => UInt8Type::class,
-    'value' => fn (array $data) => strlen($data['content']),
+    'value' => fn (Context $context) => strlen($context->data['content']),
 ],
 ```
 
@@ -373,7 +352,7 @@ For example, convert a BCD timestamp into a PHP date-time string:
 'start_time' => [
     'type'   => BCDType::class,
     'length' => 6,
-    'decode' => fn($value) => DateTime::createFromFormat('ymdHis', $value)->format('Y-m-d H:i:s'),
+    'decode' => fn($value) => DateTime::createFromFormat('ymdHis', $value)->format('20y-m-d H:i:s'),
 ],
 ```
 
@@ -411,7 +390,7 @@ or a dynamic callable:
 ```php
 'values' => [
     'type'  => UInt8Type::class,
-    'count' => fn (array $data) => $data['count'],
+    'count' => fn (Context $context) => $context->data['count'],
 ],
 ```
 
@@ -444,7 +423,7 @@ A dynamic length:
 ```php
 'ip' => [
     'type'   => StringType::class,
-    'length' => fn (Message $message) => $message['length'],
+    'length' => fn (Context $context) => $context->message['length'],
 ],
 ```
 
@@ -533,7 +512,7 @@ $schema = [
 
     'body' => [
         'type'   => StringType::class,
-        'length' => fn (Message $message) => $message['length'],
+        'length' => fn (Context $context) => $context->message['length'],
     ],
 ];
 ```
@@ -580,6 +559,8 @@ This makes the schema itself a reusable description of the binary protocol.
 
 ## Encode and Decode in One Schema
 
+> It is not recommended that encoder and decoder definitions use the same schema; the callback parameters in the Option Reference will differ.
+
 For simple protocols, a schema can be used for both encoding and decoding.
 
 ```php
@@ -617,7 +598,7 @@ A typical binary protocol definition may look like:
 $schema = [
     'length' => [
         'type'  => UInt8Type::class,
-        'value' => fn (array $data) => strlen($data['content']),
+        'value' => fn(Context $context) => strlen($context->data['content']),
     ],
 
     'content' => [
@@ -633,16 +614,8 @@ $schema = [
     'timestamp' => [
         'type'   => BCDType::class,
         'length' => 6,
-        'encode' => fn ($value) =>
-            DateTime::createFromFormat(
-                'Y-m-d H:i:s',
-                $value
-            )->format('ymdHis'),
-        'decode' => fn ($value) =>
-            DateTime::createFromFormat(
-                'ymdHis',
-                $value
-            )->format('Y-m-d H:i:s'),
+        'encode' => fn($value) => DateTime::createFromFormat('Y-m-d H:i:s', $value)->format('ymdHis'),
+        'decode' => fn($value) => DateTime::createFromFormat('ymdHis', $value)->format('20y-m-d H:i:s'),
     ],
 ];
 

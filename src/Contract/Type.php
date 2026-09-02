@@ -9,35 +9,39 @@ interface Type
     /**
      * Resolve option values.
      *
-     * Callable options are evaluated with the given arguments, while
-     * scalar or object options are returned as-is.
+     * Callable options are evaluated with the given context, while non-callable
+     * options are returned as-is.
      *
-     * This is useful when an option depends on runtime encoding or
-     * decoding arguments.
+     * The `encode` and `decode` options are preserved without being evaluated,
+     * allowing them to be invoked explicitly through {@see callable()} when
+     * required.
      *
-     * @param array $arguments Arguments passed to callable options.
-     * @param array $option    Options to resolve.
+     * @param Context $context Runtime context passed to callable options.
+     * @param array   $option  Options to resolve.
      *
-     * @return array The resolved option values.
+     * @return array The resolved options with callable values evaluated,
+     *               except for the preserved `encode` and `decode` options.
      */
-    public function options(array $arguments = [], array $option = []): array;
+    public function options(Context $context, array $option = []): array;
 
     /**
-     * Resolve and invoke a callable option.
+     * Resolve and invoke a callable.
      *
-     * When the specified option is callable, it is invoked with the given
-     * value followed by any additional arguments. Otherwise, the original
-     * value is returned unchanged.
+     * When the given value is callable, it is invoked with the value and
+     * runtime context as arguments. Otherwise, the original value is returned
+     * unchanged.
      *
-     * @param string $name         The option name containing the callable.
-     * @param mixed  $value        The value passed to the callable.
-     * @param array  $option       Options containing the callable.
-     * @param mixed  ...$arguments Additional arguments passed to the callable.
+     * This method is typically used to explicitly invoke preserved callable
+     * options such as `encode` and `decode`.
+     *
+     * @param mixed   $callable The callable to invoke.
+     * @param mixed   $value    The value passed to the callable.
+     * @param Context $context  Runtime context passed to the callable.
      *
      * @return mixed The value returned by the callable, or the original value
-     *               when the option is not callable.
+     *               when the given value is not callable.
      */
-    public function callable(string $name, mixed $value, array $option = [], mixed ...$arguments): mixed;
+    public function callable(mixed $callable, mixed $value, Context $context): mixed;
 
     /**
      * Encode a value into binary data.
