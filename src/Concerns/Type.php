@@ -286,7 +286,11 @@ abstract class Type implements TypeContract
      */
     protected function decodeValues(array $elements, array $options = []): mixed
     {
-        return array_key_exists('value', $elements) ? $elements['value'] : array_values($elements);
+        if (count($elements)) {
+            return array_key_exists('value', $elements) ? $elements['value'] : array_values($elements);
+        }
+
+        return null;
     }
 
     /**
