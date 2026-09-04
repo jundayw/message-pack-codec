@@ -36,24 +36,21 @@ $schema = [
             'DataLength'  => [0, 10],
         ],
     ],
-    'Version'             => [
-        'type'   => UInt8Type::class,
-        'decode' => function ($value, DecodeContext $context) {
-            return match ($context->message()->get('MessageBodyProperty')['VersionFlag']) {
-                1 => '2019',
-                default => '2013'
-            };
-        },
-        'length' => 0,
-    ],
     'ProtocolVersion'     => [
         'type'   => UInt8Type::class,
         'length' => function (DecodeContext $context) {
-            return match ($context->message()->get('Version')) {
-                '2013' => 0,
-                default => 1
+            return $context->message()->get('MessageBodyProperty')['VersionFlag'];
+        },
+    ],
+    'Version'             => [
+        'type'   => UInt8Type::class,
+        'decode' => function ($value, DecodeContext $context) {
+            return match ($context->message()->get('ProtocolVersion')) {
+                null => '2013',
+                default => '2019'
             };
         },
+        'length' => 0,
     ],
     'TerminalPhoneNo'     => [
         'type'   => BCDType::class,
